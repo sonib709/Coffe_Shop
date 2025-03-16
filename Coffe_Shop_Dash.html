@@ -3,17 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Data Dashboard</title>
+    <title>Coffee Shop Sales Dashboard</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         body {
-            background: #1a1a2e;
-            color: white;
-            font-family: Arial, sans-serif;
+            background: #121212;
+            color: #ffffff;
+            font-family: 'Arial', sans-serif;
             text-align: center;
+            margin: 0;
+            padding: 20px;
         }
         h1 {
-            color: #f72585;
+            color: #ff9800;
         }
         .container {
             display: grid;
@@ -25,24 +27,38 @@
             background: rgba(255, 255, 255, 0.1);
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0px 0px 15px rgba(255, 0, 150, 0.5);
+            box-shadow: 0px 0px 15px rgba(255, 152, 0, 0.5);
             backdrop-filter: blur(10px);
         }
         input {
             margin: 20px;
             padding: 10px;
-            background: #f72585;
+            background: #ff9800;
             color: white;
             border: none;
             cursor: pointer;
             border-radius: 5px;
         }
+        .stats {
+            margin-top: 10px;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
 
-    <h1>Sales Data Dashboard</h1>
+    <h1>Coffee Shop Sales Dashboard</h1>
     <input type="file" id="fileInput" accept=".json">
+
+    <div class="stats">
+        <p id="totalSales">Total Sales: $0</p>
+        <p id="avgTransaction">Avg. Transaction Value: $0</p>
+        <p id="topProduct">Top Selling Product: N/A</p>
+    </div>
 
     <div class="container">
         <div class="tile" id="chart1"></div>
@@ -71,61 +87,76 @@
             const transactionQty = data.map(d => d.transaction_qty);
             const unitPrices = data.map(d => d.unit_price);
             const categories = [...new Set(data.map(d => d.product_category))];
-            const stores = [...new Set(data.map(d => d.store_location))];
-            const storeSales = stores.map(store => {
-                return data.filter(d => d.store_location === store).reduce((sum, d) => sum + (d.transaction_qty * d.unit_price), 0);
-            });
+
+            // Calculations
+            const totalSales = data.reduce((sum, d) => sum + (d.transaction_qty * d.unit_price), 0).toFixed(2);
+            const avgTransaction = (totalSales / data.length).toFixed(2);
+            
+            // Top Selling Product
+            const productSales = data.reduce((acc, curr) => {
+                acc[curr.product_detail] = (acc[curr.product_detail] || 0) + curr.transaction_qty;
+                return acc;
+            }, {});
+            const topProduct = Object.entries(productSales).sort((a, b) => b[1] - a[1])[0][0];
+
+            document.getElementById("totalSales").textContent = `Total Sales: $${totalSales}`;
+            document.getElementById("avgTransaction").textContent = `Avg. Transaction Value: $${avgTransaction}`;
+            document.getElementById("topProduct").textContent = `Top Selling Product: ${topProduct}`;
 
             // 1. Transactions Over Time
             Plotly.newPlot('chart1', [{
                 x: transactionDates,
                 y: transactionQty,
                 type: 'bar',
-                marker: { color: '#f72585' }
+                marker: { color: '#ff9800' }
             }], { title: "Transactions Over Time", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
 
-            // 2. Sales Revenue by Store
+            // 2. Sales Revenue by Category
+            const categorySales = categories.map(cat => {
+                return data.filter(d => d.product_category === cat).reduce((sum, d) => sum + (d.transaction_qty * d.unit_price), 0);
+            });
             Plotly.newPlot('chart2', [{
-                labels: stores,
-                values: storeSales,
+                labels: categories,
+                values: categorySales,
                 type: 'pie'
-            }], { title: "Sales Revenue by Store", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
+            }], { title: "Sales by Category", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
 
-            // 3. Product Categories Breakdown
+            // 3. Price Distribution
             Plotly.newPlot('chart3', [{
-                x: categories,
-                y: categories.map(cat => data.filter(d => d.product_category === cat).length),
-                type: 'bar',
-                marker: { color: '#00f5d4' }
-            }], { title: "Product Categories Breakdown", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
-
-            // 4. Price Distribution
-            Plotly.newPlot('chart4', [{
                 x: unitPrices,
                 type: 'histogram',
-                marker: { color: '#ff9f1c' }
+                marker: { color: '#e63946' }
             }], { title: "Price Distribution", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
 
-            // 5. Top Selling Products
-            const productSales = data.reduce((acc, curr) => {
-                acc[curr.product_detail] = (acc[curr.product_detail] || 0) + curr.transaction_qty;
-                return acc;
-            }, {});
+            // 4. Top Selling Products
             const sortedProducts = Object.entries(productSales).sort((a, b) => b[1] - a[1]);
-            Plotly.newPlot('chart5', [{
+            Plotly.newPlot('chart4', [{
                 x: sortedProducts.map(p => p[0]),
                 y: sortedProducts.map(p => p[1]),
                 type: 'bar',
-                marker: { color: '#7209b7' }
+                marker: { color: '#06d6a0' }
             }], { title: "Top Selling Products", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
 
-            // 6. Sales Revenue Distribution
-            Plotly.newPlot('chart6', [{
+            // 5. Sales Revenue Distribution Over Time
+            Plotly.newPlot('chart5', [{
                 x: transactionDates,
                 y: data.map(d => d.transaction_qty * d.unit_price),
                 mode: 'lines+markers',
-                line: { color: '#3a86ff' }
-            }], { title: "Sales Revenue Distribution", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
+                line: { color: '#118ab2' }
+            }], { title: "Revenue Over Time", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
+
+            // 6. Total Sales Per Store Location
+            const stores = [...new Set(data.map(d => d.store_location))];
+            const storeSales = stores.map(store => {
+                return data.filter(d => d.store_location === store).reduce((sum, d) => sum + (d.transaction_qty * d.unit_price), 0);
+            });
+
+            Plotly.newPlot('chart6', [{
+                x: stores,
+                y: storeSales,
+                type: 'bar',
+                marker: { color: '#8338ec' }
+            }], { title: "Sales by Store Location", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
         }
     </script>
 
