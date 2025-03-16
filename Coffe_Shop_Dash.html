@@ -7,15 +7,24 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         body {
-            background: #121212;
-            color: #ffffff;
+            background: #f8f9fa;
+            color: #333;
             font-family: 'Arial', sans-serif;
             text-align: center;
             margin: 0;
             padding: 20px;
         }
         h1 {
-            color: #ff9800;
+            color: #007bff;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        select {
+            padding: 8px;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
         }
         .container {
             display: grid;
@@ -24,16 +33,15 @@
             padding: 20px;
         }
         .tile {
-            background: rgba(255, 255, 255, 0.1);
+            background: white;
             padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0px 0px 15px rgba(255, 152, 0, 0.5);
-            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
         input {
             margin: 20px;
             padding: 10px;
-            background: #ff9800;
+            background: #007bff;
             color: white;
             border: none;
             cursor: pointer;
@@ -44,15 +52,30 @@
             padding: 15px;
             font-size: 18px;
             font-weight: bold;
-            background: rgba(255, 255, 255, 0.1);
+            background: white;
             border-radius: 8px;
+            display: inline-block;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
 <body>
 
     <h1>Coffee Shop Sales Dashboard</h1>
+    
     <input type="file" id="fileInput" accept=".json">
+
+    <div class="controls">
+        <label>Filter by Category:</label>
+        <select id="categoryFilter">
+            <option value="All">All</option>
+        </select>
+
+        <label>Filter by Store Location:</label>
+        <select id="storeFilter">
+            <option value="All">All</option>
+        </select>
+    </div>
 
     <div class="stats">
         <p id="totalSales">Total Sales: $0</p>
@@ -70,17 +93,58 @@
     </div>
 
     <script>
+        let originalData = [];
+
         document.getElementById("fileInput").addEventListener("change", function(event) {
             const file = event.target.files[0];
             if (!file) return;
             
             const reader = new FileReader();
             reader.onload = function(e) {
-                const data = JSON.parse(e.target.result);
-                generateDashboard(data);
+                originalData = JSON.parse(e.target.result);
+                populateFilters(originalData);
+                generateDashboard(originalData);
             };
             reader.readAsText(file);
         });
+
+        document.getElementById("categoryFilter").addEventListener("change", applyFilters);
+        document.getElementById("storeFilter").addEventListener("change", applyFilters);
+
+        function populateFilters(data) {
+            const categories = [...new Set(data.map(d => d.product_category))];
+            const stores = [...new Set(data.map(d => d.store_location))];
+
+            const categoryFilter = document.getElementById("categoryFilter");
+            const storeFilter = document.getElementById("storeFilter");
+
+            categoryFilter.innerHTML = '<option value="All">All</option>';
+            storeFilter.innerHTML = '<option value="All">All</option>';
+
+            categories.forEach(cat => {
+                categoryFilter.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+
+            stores.forEach(store => {
+                storeFilter.innerHTML += `<option value="${store}">${store}</option>`;
+            });
+        }
+
+        function applyFilters() {
+            const selectedCategory = document.getElementById("categoryFilter").value;
+            const selectedStore = document.getElementById("storeFilter").value;
+
+            let filteredData = originalData;
+
+            if (selectedCategory !== "All") {
+                filteredData = filteredData.filter(d => d.product_category === selectedCategory);
+            }
+            if (selectedStore !== "All") {
+                filteredData = filteredData.filter(d => d.store_location === selectedStore);
+            }
+
+            generateDashboard(filteredData);
+        }
 
         function generateDashboard(data) {
             const transactionDates = data.map(d => d.transaction_date);
@@ -97,7 +161,7 @@
                 acc[curr.product_detail] = (acc[curr.product_detail] || 0) + curr.transaction_qty;
                 return acc;
             }, {});
-            const topProduct = Object.entries(productSales).sort((a, b) => b[1] - a[1])[0][0];
+            const topProduct = Object.entries(productSales).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A";
 
             document.getElementById("totalSales").textContent = `Total Sales: $${totalSales}`;
             document.getElementById("avgTransaction").textContent = `Avg. Transaction Value: $${avgTransaction}`;
@@ -108,8 +172,8 @@
                 x: transactionDates,
                 y: transactionQty,
                 type: 'bar',
-                marker: { color: '#ff9800' }
-            }], { title: "Transactions Over Time", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
+                marker: { color: '#007bff' }
+            }], { title: "Transactions Over Time" });
 
             // 2. Sales Revenue by Category
             const categorySales = categories.map(cat => {
@@ -119,44 +183,36 @@
                 labels: categories,
                 values: categorySales,
                 type: 'pie'
-            }], { title: "Sales by Category", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
+            }], { title: "Sales by Category" });
 
             // 3. Price Distribution
             Plotly.newPlot('chart3', [{
                 x: unitPrices,
                 type: 'histogram',
                 marker: { color: '#e63946' }
-            }], { title: "Price Distribution", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
+            }], { title: "Price Distribution" });
 
             // 4. Top Selling Products
             const sortedProducts = Object.entries(productSales).sort((a, b) => b[1] - a[1]);
             Plotly.newPlot('chart4', [{
                 x: sortedProducts.map(p => p[0]),
                 y: sortedProducts.map(p => p[1]),
-                type: 'bar',
-                marker: { color: '#06d6a0' }
-            }], { title: "Top Selling Products", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
+                type: 'bar'
+            }], { title: "Top Selling Products" });
 
-            // 5. Sales Revenue Distribution Over Time
+            // 5. Revenue Over Time
             Plotly.newPlot('chart5', [{
                 x: transactionDates,
                 y: data.map(d => d.transaction_qty * d.unit_price),
-                mode: 'lines+markers',
-                line: { color: '#118ab2' }
-            }], { title: "Revenue Over Time", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
+                mode: 'lines+markers'
+            }], { title: "Revenue Over Time" });
 
-            // 6. Total Sales Per Store Location
-            const stores = [...new Set(data.map(d => d.store_location))];
-            const storeSales = stores.map(store => {
-                return data.filter(d => d.store_location === store).reduce((sum, d) => sum + (d.transaction_qty * d.unit_price), 0);
-            });
-
+            // 6. Sales by Store Location
             Plotly.newPlot('chart6', [{
-                x: stores,
-                y: storeSales,
-                type: 'bar',
-                marker: { color: '#8338ec' }
-            }], { title: "Sales by Store Location", paper_bgcolor: 'transparent', plot_bgcolor: 'transparent' });
+                x: [...new Set(data.map(d => d.store_location))],
+                y: data.map(d => d.transaction_qty * d.unit_price),
+                type: 'bar'
+            }], { title: "Sales by Store Location" });
         }
     </script>
 
